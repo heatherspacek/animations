@@ -1,0 +1,9 @@
+[package]
+name = "messvis"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dat_tools = { git = "https://github.com/AlexanderHarrison/dat_extractor.git" }
+slp_parser = { git = "https://github.com/AlexanderHarrison/slp_parser.git" }
+glam = { version = "0.29", features = ["bytemuck"] }
