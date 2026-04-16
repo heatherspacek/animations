@@ -26,18 +26,22 @@ def draw_capsule(y1, z1, y2, z2, size):
         draw_circle(x, y, size)
 
 
-if __name__ == "__main__":
+def hitboxes_from_file(file_path):
     from itertools import groupby
 
-    with open("da2.crds") as f:
+    with open(file_path) as f:
         coords_raw = f.read().splitlines()
 
     sep = "==="
     frames = [list(g) for k, g in groupby(coords_raw, lambda x: x == sep) if not k]
+    return frames
 
-    with open("hit.crds") as f:
+
+def hurtboxes_from_file(file_path):
+    with open(file_path) as f:
         hitbox_coords_raw = f.read().splitlines()
 
+    sep = "==="
     hits = []
     frame_ctr = -1
     for hb_line in hitbox_coords_raw:
@@ -46,10 +50,16 @@ if __name__ == "__main__":
             hits.append([])
         else:
             hits[frame_ctr].append(hb_line)
-    breakpoint()
+    return hits
+
+
+if __name__ == "__main__":
+    
+    frames = hurtboxes_from_file("output_hurtboxes.crd")
+    hits = hitboxes_from_file("output_hitboxes.crd")
 
     root = tk.Tk()
-    root.title("Basic Canvas Drawing")
+    root.title("Hitbox/hurtbox visualization (unknown move)")
 
     canvas = tk.Canvas(root, width=400, height=300, bg="white")
     canvas.pack()
