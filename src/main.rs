@@ -25,6 +25,36 @@ struct HitboxDataFrame {
     set_knockback: u16,
 }
 
+static CHAR_SCALE_MAP: &[f32] = &[
+    1.10, // Mario        
+    0.96, // Fox          
+    0.97, // CaptainFalcon
+    1.00, // DonkeyKong   
+    0.92, // Kirby        
+    0.69, // Bowser       
+    1.22, // Link         
+    1.40, // Sheik        
+    1.00, // Ness         
+    1.15, // Peach        
+    1.15, // Popo         
+    1.15, // Nana         
+    0.90, // Pikachu      
+    0.88, // Samus        
+    1.05, // Yoshi        
+    0.94, // Jigglypuff   
+    1.00, // Mewtwo       
+    1.25, // Luigi        
+    1.10, // Marth        
+    1.26, // Zelda        
+    0.96, // YoungLink    
+    1.10, // DrMario      
+    1.10, // Falco        
+    0.50, // Pichu        
+    1.02, // GameAndWatch 
+    1.08, // Ganondorf    
+    1.08, // Roy          
+];
+
 fn main() {
     // input arguments: character, move id
     let args: Vec<String> = env::args().collect();
@@ -44,8 +74,8 @@ fn main() {
     let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
 
     let c = match input_char.to_lowercase().as_str() {
-        "fox" => slp_parser::Character::Fox,
-        "marth" => slp_parser::Character::Marth,
+        "fox" => Character::Fox,
+        "marth" => Character::Marth,
         _ => panic!("Unknown character supplied (\"{}\")", args[1]),
     };
     
@@ -131,7 +161,7 @@ fn main() {
 
     let mut active_hb_slots: [Option<&HitboxDataFrame>; 16] = [None; 16];
 
-    let mut world_transforms =  vec![Mat4::IDENTITY; 73];
+    let mut world_transforms =  vec![Mat4::IDENTITY; _bones.len()];
     for frame_i in 0..(dash_attack.end_frame() as i32) {
         let _ = writeln!(writer_hurt, "===");
         let _ = writeln!(writer_hit, "===");
@@ -164,7 +194,7 @@ fn main() {
             
             let pos_a = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_1));
             let pos_b = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_2));
-            let size = hurtbox.size * 0.96;
+            let size = hurtbox.size * CHAR_SCALE_MAP[c.to_u8_internal() as usize];
             // println!("{},{},{},{},{},{},{}", pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size);
             let _ = writeln!(
                 writer_hurt,
@@ -194,7 +224,9 @@ fn main() {
                 this_hb.z_offset as f32,
                 this_hb.y_offset as f32,
                 this_hb.x_offset as f32,
-            ]) * SCALE;
+            ])
+            * SCALE
+            * CHAR_SCALE_MAP[c.to_u8_internal() as usize];
             let connected_bone = this_hb.bone_attachment;
             let assoc_transform = world_transforms[connected_bone as usize];
             let resultant_pt: Vec3 = assoc_transform.transform_point3(pt);
@@ -216,36 +248,6 @@ fn main() {
             );
         }
     }
-
-    static CHAR_SCALE_MAP: &[f32] = &[
-        1.10, // Mario        
-        0.96, // Fox          
-        0.97, // CaptainFalcon
-        1.00, // DonkeyKong   
-        0.92, // Kirby        
-        0.69, // Bowser       
-        1.22, // Link         
-        1.40, // Sheik        
-        1.00, // Ness         
-        1.15, // Peach        
-        1.15, // Popo         
-        1.15, // Nana         
-        0.90, // Pikachu      
-        0.88, // Samus        
-        1.05, // Yoshi        
-        0.94, // Jigglypuff   
-        1.00, // Mewtwo       
-        1.25, // Luigi        
-        1.10, // Marth        
-        1.26, // Zelda        
-        0.96, // YoungLink    
-        1.10, // DrMario      
-        1.10, // Falco        
-        0.50, // Pichu        
-        1.02, // GameAndWatch 
-        1.08, // Ganondorf    
-        1.08, // Roy          
-    ];
 
     // println!("{} hurtboxes: {:?}", fi.hurtboxes.len(), fi.hurtboxes);  // 13, ASSOCIATED to bones.
     // println!("{} bones: {:?}", bones.len(), bones);  // 73. Have "parents" and pgroup_start, pgroup_len
