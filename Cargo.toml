@@ -7,3 +7,4 @@ edition = "2024"
 dat_tools = { git = "https://github.com/AlexanderHarrison/dat_extractor.git" }
 slp_parser = { git = "https://github.com/AlexanderHarrison/slp_parser.git" }
 glam = { version = "0.29", features = ["bytemuck"] }
+rusqlite = { version = "0.39.0", features = ["bundled"] }

@@ -2,6 +2,12 @@
 use dat_tools::dat::AnimationFrame;
 
 use glam::f32::{Mat4, Vec3};
+use slp_parser::Character;
+
+use core::panic;
+use std::env;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
 #[derive(Debug, Clone)]
 struct HitboxDataFrame {
@@ -20,21 +26,35 @@ struct HitboxDataFrame {
 }
 
 fn main() {
-    const MOVE_ID: usize = 072;
+    // input arguments: character, move id
+    let args: Vec<String> = env::args().collect();
+    let input_char = if args.len() < 3 { "fox" } 
+        else { args[1].as_str() };
+    let input_move: usize = if args.len() < 3 { 72 }
+        else { args[2].parse::<usize>().unwrap() };
+
+    let file_hurt = File::create("output_hurtboxes.crd").unwrap();
+    let file_hit = File::create("output_hitboxes.crd").unwrap();
+    let mut writer_hurt = BufWriter::new(file_hurt);
+    let mut writer_hit = BufWriter::new(file_hit);
 
     let file = std::fs::File::open(
         "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
     ).unwrap();
     let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
 
-    let c = slp_parser::Character::Fox;
+    let c = match input_char.to_lowercase().as_str() {
+        "fox" => slp_parser::Character::Fox,
+        "marth" => slp_parser::Character::Marth,
+        _ => panic!("Unknown character supplied (\"{}\")", args[1]),
+    };
+    
     let fi = dat_tools::get_fighter_data(&mut files, c.neutral()).unwrap();
-    // let (mdl, anim) = dat_tools::get_common_model_and_animation(&mut files, 2);
 
     let _hb = fi.hurtboxes.clone();
     let _bones = fi.model.bones.clone();
 
-    let dash_attack = fi.action_table.get(MOVE_ID).unwrap().animation.clone().unwrap();
+    let dash_attack = fi.action_table.get(input_move).unwrap().animation.clone().unwrap();
     let _bone_trans = dash_attack.bone_transforms.clone(); // one for each bone!!!!!!!!!!
     
     let mut anim: AnimationFrame = AnimationFrame::new_default_pose(&fi.model);
@@ -42,7 +62,7 @@ fn main() {
     let mut hitboxes: Vec<HitboxDataFrame> = Vec::new();
     let mut clears: Vec<usize> = Vec::new();
     let mut h_end = 0u32;
-    if let Some(subactions) = fi.action_table[MOVE_ID].subactions.as_ref() {
+    if let Some(subactions) = fi.action_table[input_move].subactions.as_ref() {
         let mut f = 0;
         let mut i = 0;
         let mut subloop_start = 0usize;
@@ -105,17 +125,16 @@ fn main() {
             i += dat_tools::dat::subaction_size(cmd);
         }
 
-        println!("{:?}", hitboxes);
-        println!("{:?}", clears);
+        // println!("{:?}", hitboxes);
+        // println!("{:?}", clears);
     }
 
     let mut active_hb_slots: [Option<&HitboxDataFrame>; 16] = [None; 16];
 
-    // let mut world_transforms = fi.model.base_transforms.clone();
     let mut world_transforms =  vec![Mat4::IDENTITY; 73];
     for frame_i in 0..(dash_attack.end_frame() as i32) {
-        // println!("FRAME #{} =====", frame_i);
-        println!("===");
+        let _ = writeln!(writer_hurt, "===");
+        let _ = writeln!(writer_hit, "===");
         anim.apply_animation(&fi.model, &dash_attack, frame_i as f32);
 
         // LATER: extracting model vertices -----------------------
@@ -147,7 +166,13 @@ fn main() {
             let pos_b = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_2));
             let size = hurtbox.size * 0.96;
             // println!("{},{},{},{},{},{},{}", pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size);
+            let _ = writeln!(
+                writer_hurt,
+                "{},{},{},{},{},{},{}",
+                pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size
+            );
         }
+        let _ = writer_hurt.flush();
 
         // once per frame,
         // -> look for any `hitboxes` that just started. register em
@@ -174,7 +199,8 @@ fn main() {
             let assoc_transform = world_transforms[connected_bone as usize];
             let resultant_pt: Vec3 = assoc_transform.transform_point3(pt);
 
-            println!(
+            let _ = writeln!(
+                writer_hit,
                 "{},{},{},{},{},{},{},{},{},{},{}",
                 frame_i,
                 this_hb.hitbox_id,
@@ -187,7 +213,7 @@ fn main() {
                 resultant_pt.y,
                 resultant_pt.z,
                 (this_hb.size as f32) * SCALE,
-            )
+            );
         }
     }
 
