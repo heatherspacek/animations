@@ -26,7 +26,7 @@ def draw_capsule(y1, z1, y2, z2, size):
         draw_circle(x, y, size)
 
 
-def hitboxes_from_file(file_path):
+def hurtboxes_from_file(file_path):
     from itertools import groupby
 
     with open(file_path) as f:
@@ -37,7 +37,7 @@ def hitboxes_from_file(file_path):
     return frames
 
 
-def hurtboxes_from_file(file_path):
+def hitboxes_from_file(file_path):
     with open(file_path) as f:
         hitbox_coords_raw = f.read().splitlines()
 
