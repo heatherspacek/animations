@@ -9,6 +9,39 @@ use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
+use pyo3::prelude::*;
+
+#[pyfunction]
+fn say_hi() {
+    println!("Hello from RUST!!!");
+}
+
+#[pyfunction]
+fn read_iso(iso_path: &str) -> PyResult<Vec<Vec<(usize, String)>>> {
+    let file = std::fs::File::open(
+        iso_path
+    )?;
+
+    let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
+    let all_characters = Character::AS_LIST;
+
+    let mut full_ret: Vec<Vec<(usize, String)>> = Vec::new();
+    for ch in all_characters {
+        let character = ch.neutral();
+        let data = dat_tools::get_fighter_data(&mut files, character).unwrap();
+
+        let mut char_ret: Vec<(usize, String)> = Vec::new();
+        for (i, a) in data.action_table.iter().enumerate() {
+            let name: &str = a.name.as_deref().map(dat_tools::dat::demangle_anim_name).flatten().unwrap_or("");
+            // println!("{:3} {}", i, name);
+            char_ret.push((i, name.to_string()));
+        }
+        full_ret.push(char_ret);
+    }
+    Ok(full_ret)
+}
+
+
 #[derive(Debug, Clone)]
 struct HitboxDataFrame {
     frame: u32,
@@ -55,6 +88,7 @@ static CHAR_SCALE_MAP: &[f32] = &[
     1.08, // Roy          
 ];
 
+#[pyfunction]
 fn main() {
     // input arguments: character, move id
     let args: Vec<String> = env::args().collect();
@@ -251,4 +285,13 @@ fn main() {
 
     // println!("{} hurtboxes: {:?}", fi.hurtboxes.len(), fi.hurtboxes);  // 13, ASSOCIATED to bones.
     // println!("{} bones: {:?}", bones.len(), bones);  // 73. Have "parents" and pgroup_start, pgroup_len
+}
+
+
+#[pymodule]
+fn animations(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(say_hi, m)?)?;
+    m.add_function(wrap_pyfunction!(read_iso, m)?)?;
+    m.add_function(wrap_pyfunction!(main, m)?)?;
+    Ok(())
 }
