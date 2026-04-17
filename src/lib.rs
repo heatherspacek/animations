@@ -1,5 +1,5 @@
 
-use dat_tools::dat::AnimationFrame;
+use dat_tools::dat::{AnimationFrame, FighterData};
 
 use glam::f32::{Mat4, Vec3};
 use slp_parser::Character;
@@ -11,36 +11,39 @@ use std::io::{BufWriter, Write};
 
 use pyo3::prelude::*;
 
-#[pyfunction]
-fn say_hi() {
-    println!("Hello from RUST!!!");
-}
 
 #[pyfunction]
-fn read_iso(iso_path: &str) -> PyResult<Vec<Vec<(usize, String)>>> {
+fn data_dump(iso_path: &str) -> PyResult<(
+    Vec<Vec<(usize, String)>>,  // Animations map
+    i32
+)> {
     let file = std::fs::File::open(
         iso_path
     )?;
-
     let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
     let all_characters = Character::AS_LIST;
 
     let mut full_ret: Vec<Vec<(usize, String)>> = Vec::new();
+
+
     for ch in all_characters {
         let character = ch.neutral();
         let data = dat_tools::get_fighter_data(&mut files, character).unwrap();
 
-        let mut char_ret: Vec<(usize, String)> = Vec::new();
-        for (i, a) in data.action_table.iter().enumerate() {
-            let name: &str = a.name.as_deref().map(dat_tools::dat::demangle_anim_name).flatten().unwrap_or("");
-            // println!("{:3} {}", i, name);
-            char_ret.push((i, name.to_string()));
-        }
-        full_ret.push(char_ret);
+        full_ret.push(get_anim_map(&data));
     }
-    Ok(full_ret)
+    Ok((full_ret, 27i32))
 }
 
+
+fn get_anim_map(fighter_data: &FighterData) -> Vec<(usize, String)> {
+    let mut char_ret: Vec<(usize, String)> = Vec::new();
+    for (i, a) in fighter_data.action_table.iter().enumerate() {
+        let name: &str = a.name.as_deref().map(dat_tools::dat::demangle_anim_name).flatten().unwrap_or("");
+        char_ret.push((i, name.to_string()));
+    }
+    char_ret
+}
 
 #[derive(Debug, Clone)]
 struct HitboxDataFrame {
@@ -287,11 +290,9 @@ fn main() {
     // println!("{} bones: {:?}", bones.len(), bones);  // 73. Have "parents" and pgroup_start, pgroup_len
 }
 
-
 #[pymodule]
 fn animations(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(say_hi, m)?)?;
-    m.add_function(wrap_pyfunction!(read_iso, m)?)?;
+    m.add_function(wrap_pyfunction!(data_dump, m)?)?;
     m.add_function(wrap_pyfunction!(main, m)?)?;
     Ok(())
 }
