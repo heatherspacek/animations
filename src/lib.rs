@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 fn data_dump(iso_path: &str) -> PyResult<(
     Vec<String>,  // Character names
     Vec<Vec<String>>,  // Animations maps
-    Vec<Vec<Vec<HurtBoxProcessed>>>, // Hurtbox lists
+    Vec<Vec<Vec<Vec<HurtBoxProcessed>>>>, // Hurtbox lists
     Vec<Vec<Vec<HitBoxProcessed>>>, // Hitbox lists
 )> {
     let file = std::fs::File::open(
@@ -27,7 +27,7 @@ fn data_dump(iso_path: &str) -> PyResult<(
     let mut all_character_names: Vec<String> = Vec::new();
     let mut all_animations_maps: Vec<Vec<String>> = Vec::new();
     let mut all_hitbox_lists: Vec<Vec<Vec<HitBoxProcessed>>> = Vec::new();
-    let mut all_hurtbox_lists: Vec<Vec<Vec<HurtBoxProcessed>>> = Vec::new();
+    let mut all_hurtbox_lists: Vec<Vec<Vec<Vec<HurtBoxProcessed>>>> = Vec::new();
 
     for ch in all_characters {
         let character = ch.neutral();
@@ -121,13 +121,13 @@ static CHAR_SCALE_MAP: &[f32] = &[
 ];
 
 fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -> 
-    (Vec<Vec<HurtBoxProcessed>>, Vec<Vec<HitBoxProcessed>>)
+    (Vec<Vec<Vec<HurtBoxProcessed>>>, Vec<Vec<HitBoxProcessed>>)
 {
-    let mut fighter_hurt_lists: Vec<Vec<HurtBoxProcessed>> = Vec::new();
+    let mut fighter_hurt_lists: Vec<Vec<Vec<HurtBoxProcessed>>> = Vec::new();
     let mut fighter_hit_lists: Vec<Vec<HitBoxProcessed>> = Vec::new();
     for action in fighter_data.action_table.iter().as_ref() {
         // ===== ONCE PER ACTION ... =====
-        let mut action_hurt_list: Vec<HurtBoxProcessed> = Vec::new();
+        let mut action_hurt_list: Vec<Vec<HurtBoxProcessed>> = Vec::new();
         let mut action_hit_list: Vec<HitBoxProcessed> = Vec::new();
         let (hits, clears) = hits_and_clears(
             action.subactions.as_ref()
@@ -135,9 +135,12 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
         let mut active_hb_slots: [Option<&HitboxDataFrame>; 16] = [None; 16];
         let mut anim: AnimationFrame = AnimationFrame::new_default_pose(&fighter_data.model);
         let mut world_transforms = vec![Mat4::IDENTITY; fighter_data.model.bones.len()];
-        for (i, frame ) in action.animation.iter().enumerate() {
+
+        let action_anim = action.animation.as_ref();
+        if action_anim.is_some() {
+            for i in 0..action_anim.unwrap().end_frame() as usize {
             // ===== ONCE PER FRAME ...
-            anim.apply_animation(&fighter_data.model, frame, i as f32);
+            anim.apply_animation(&fighter_data.model, action_anim.unwrap(), i as f32);
             
             for (bone_i, transform) in anim.transforms.iter().enumerate() {
                 world_transforms[bone_i] = match fighter_data.model.bones[bone_i].parent {
@@ -145,7 +148,7 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                     None => *transform
                 };
             }
-
+            let mut frame_hurt_list: Vec<HurtBoxProcessed> = Vec::new();
             // HURTbox math
             for hurtbox in fighter_data.hurtboxes.iter() {
                 if hurtbox.bone >= world_transforms.len() as u8 {
@@ -158,7 +161,7 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                 let pos_b = world_tform.transform_point3(hurtbox.offset_2);
                 let size = hurtbox.size * CHAR_SCALE_MAP[fighter_internal_id];
 
-                action_hurt_list.push(HurtBoxProcessed {
+                frame_hurt_list.push(HurtBoxProcessed {
                     pos_a: pos_a.into(),
                     pos_b: pos_b.into(),
                     size: size
@@ -209,8 +212,9 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                 });
             }
 
+            action_hurt_list.push(frame_hurt_list);
         }
-
+        }
         fighter_hurt_lists.push(action_hurt_list);
         fighter_hit_lists.push(action_hit_list);
     }
