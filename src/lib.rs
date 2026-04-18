@@ -11,9 +11,9 @@ use std::io::{BufWriter, Write};
 
 use pyo3::prelude::*;
 
-
 #[pyfunction]
 fn data_dump(iso_path: &str) -> PyResult<(
+    Vec<String>,  // Character names
     Vec<Vec<String>>,  // Animations maps
     Vec<Vec<Vec<HurtBoxProcessed>>>, // Hurtbox lists
     Vec<Vec<Vec<HitBoxProcessed>>>, // Hitbox lists
@@ -24,6 +24,7 @@ fn data_dump(iso_path: &str) -> PyResult<(
     let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
     let all_characters = Character::AS_LIST;
 
+    let mut all_character_names: Vec<String> = Vec::new();
     let mut all_animations_maps: Vec<Vec<String>> = Vec::new();
     let mut all_hitbox_lists: Vec<Vec<Vec<HitBoxProcessed>>> = Vec::new();
     let mut all_hurtbox_lists: Vec<Vec<Vec<HurtBoxProcessed>>> = Vec::new();
@@ -31,19 +32,15 @@ fn data_dump(iso_path: &str) -> PyResult<(
     for ch in all_characters {
         let character = ch.neutral();
         let data = dat_tools::get_fighter_data(&mut files, character).unwrap();
-        if data.character_name.as_ref() == "Kirby" {
-            continue;
-        }
-
+        all_character_names.push(data.character_name.clone().into_string());
         all_animations_maps.push(get_anim_map(&data));
-        // println!("DONE =========== {}", all_hitbox_lists.len());
         let (ch_hurts, ch_hits) = compute_frame_lists(
             &data, ch.to_u8_internal() as usize
         );
         all_hitbox_lists.push(ch_hits);
         all_hurtbox_lists.push(ch_hurts);
     }
-    Ok((all_animations_maps, all_hurtbox_lists, all_hitbox_lists))
+    Ok((all_character_names, all_animations_maps, all_hurtbox_lists, all_hitbox_lists))
 }
 
 
@@ -187,6 +184,11 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                 * SCALE
                 * CHAR_SCALE_MAP[fighter_internal_id];
                 let size = (this_hb.size as f32 * SCALE) * CHAR_SCALE_MAP[fighter_internal_id];
+
+                if this_hb.bone_attachment >= world_transforms.len() as u8 {
+                    // Kirby bullshit
+                    continue;
+                }
                 let assoc_transform = world_transforms[(this_hb.bone_attachment) as usize];
                 let resultant_pt: Vec3 = assoc_transform.transform_point3(pt);
 
