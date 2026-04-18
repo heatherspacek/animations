@@ -14,8 +14,9 @@ use pyo3::prelude::*;
 
 #[pyfunction]
 fn data_dump(iso_path: &str) -> PyResult<(
-    Vec<Vec<String>>,  // Animations map
-    i32
+    Vec<Vec<String>>,  // Animations maps
+    Vec<Vec<Vec<HurtBoxProcessed>>>, // Hurtbox lists
+    Vec<Vec<Vec<HitBoxProcessed>>>, // Hitbox lists
 )> {
     let file = std::fs::File::open(
         iso_path
@@ -24,19 +25,25 @@ fn data_dump(iso_path: &str) -> PyResult<(
     let all_characters = Character::AS_LIST;
 
     let mut all_animations_maps: Vec<Vec<String>> = Vec::new();
-    let mut all_hitbox_lists: Vec<usize> = Vec::new();
+    let mut all_hitbox_lists: Vec<Vec<Vec<HitBoxProcessed>>> = Vec::new();
+    let mut all_hurtbox_lists: Vec<Vec<Vec<HurtBoxProcessed>>> = Vec::new();
 
     for ch in all_characters {
         let character = ch.neutral();
         let data = dat_tools::get_fighter_data(&mut files, character).unwrap();
-
+        if data.character_name.as_ref() == "Kirby" {
+            continue;
+        }
 
         all_animations_maps.push(get_anim_map(&data));
-        all_hitbox_lists.push(1usize);  // ...
-
-
+        // println!("DONE =========== {}", all_hitbox_lists.len());
+        let (ch_hurts, ch_hits) = compute_frame_lists(
+            &data, ch.to_u8_internal() as usize
+        );
+        all_hitbox_lists.push(ch_hits);
+        all_hurtbox_lists.push(ch_hurts);
     }
-    Ok((all_animations_maps, 27i32))
+    Ok((all_animations_maps, all_hurtbox_lists, all_hitbox_lists))
 }
 
 
@@ -65,14 +72,14 @@ struct HitboxDataFrame {
     set_knockback: u16,
 }
 
-#[derive(Debug, Clone)]
+#[pyclass]
 struct HurtBoxProcessed {
     pos_a: Vec3,
     pos_b: Vec3,
     size: f32
 }
 
-#[derive(Debug, Clone)]
+#[pyclass]
 struct HitBoxProcessed {
     frame_i: usize,
     hitbox_id: u8,
@@ -130,8 +137,7 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
         );
         let mut active_hb_slots: [Option<&HitboxDataFrame>; 16] = [None; 16];
         let mut anim: AnimationFrame = AnimationFrame::new_default_pose(&fighter_data.model);
-        let mut world_transforms =  vec![Mat4::IDENTITY; fighter_data.model.bones.len()];
-
+        let mut world_transforms = vec![Mat4::IDENTITY; fighter_data.model.bones.len()];
         for (i, frame ) in action.animation.iter().enumerate() {
             // ===== ONCE PER FRAME ...
             anim.apply_animation(&fighter_data.model, frame, i as f32);
@@ -144,7 +150,11 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
             }
 
             // HURTbox math
-            for hurtbox in fighter_data.hurtboxes.as_ref() {
+            for hurtbox in fighter_data.hurtboxes.iter() {
+                if hurtbox.bone >= world_transforms.len() as u8 {
+                    // Kirby bullshit
+                    continue;
+                }
                 let world_tform = world_transforms[hurtbox.bone as usize];
                 
                 let pos_a = world_tform.transform_point3(hurtbox.offset_1);
@@ -272,207 +282,210 @@ fn hits_and_clears(subactions_list: Option<&Box<[u32]>>) ->
     (hits, clears)
 }
 
-#[pyfunction]
-fn main() {
-    // input arguments: character, move id
-    let args: Vec<String> = env::args().collect();
-    let input_char = if args.len() < 3 { "fox" } 
-        else { args[1].as_str() };
-    let input_move: usize = if args.len() < 3 { 72 }
-        else { args[2].parse::<usize>().unwrap() };
+// #[pyfunction]
+// fn main() {
+//     // input arguments: character, move id
+//     let args: Vec<String> = env::args().collect();
+//     let input_char = if args.len() < 3 { "fox" } 
+//         else { args[1].as_str() };
+//     let input_move: usize = if args.len() < 3 { 72 }
+//         else { args[2].parse::<usize>().unwrap() };
 
-    let file_hurt = File::create("output_hurtboxes.crd").unwrap();
-    let file_hit = File::create("output_hitboxes.crd").unwrap();
-    let mut writer_hurt = BufWriter::new(file_hurt);
-    let mut writer_hit = BufWriter::new(file_hit);
+//     let file_hurt = File::create("output_hurtboxes.crd").unwrap();
+//     let file_hit = File::create("output_hitboxes.crd").unwrap();
+//     let mut writer_hurt = BufWriter::new(file_hurt);
+//     let mut writer_hit = BufWriter::new(file_hit);
 
-    let file = std::fs::File::open(
-        "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
-    ).unwrap();
-    let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
+//     let file = std::fs::File::open(
+//         "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
+//     ).unwrap();
+//     let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
 
-    let c = match input_char.to_lowercase().as_str() {
-        "fox" => Character::Fox,
-        "marth" => Character::Marth,
-        _ => panic!("Unknown character supplied (\"{}\")", args[1]),
-    };
+//     let c = match input_char.to_lowercase().as_str() {
+//         "fox" => Character::Fox,
+//         "marth" => Character::Marth,
+//         _ => panic!("Unknown character supplied (\"{}\")", args[1]),
+//     };
     
-    let fi = dat_tools::get_fighter_data(&mut files, c.neutral()).unwrap();
-    let _hb = fi.hurtboxes.clone();
-    let _bones = fi.model.bones.clone();
+//     let fi = dat_tools::get_fighter_data(&mut files, c.neutral()).unwrap();
+//     let _hb = fi.hurtboxes.clone();
+//     let _bones = fi.model.bones.clone();
 
-    let dash_attack = fi.action_table.get(input_move).unwrap().animation.clone().unwrap();
-    let _bone_trans = dash_attack.bone_transforms.clone(); // one for each bone!!!!!!!!!!
+//     let dash_attack = fi.action_table.get(input_move).unwrap().animation.clone().unwrap();
+//     let _bone_trans = dash_attack.bone_transforms.clone(); // one for each bone!!!!!!!!!!
     
-    let mut anim: AnimationFrame = AnimationFrame::new_default_pose(&fi.model);
+//     let mut anim: AnimationFrame = AnimationFrame::new_default_pose(&fi.model);
 
-    let mut hitboxes: Vec<HitboxDataFrame> = Vec::new();
-    let mut clears: Vec<usize> = Vec::new();
-    let mut h_end = 0u32;
-    if let Some(subactions) = fi.action_table[input_move].subactions.as_ref() {
-        let mut f = 0;
-        let mut i = 0;
-        let mut subloop_start = 0usize;
-        let mut subloop_i = 0usize;
-        while i < subactions.len() {
-            let word = subactions[i];
-            let cmd = dat_tools::dat::subaction_cmd(word);
+//     let mut hitboxes: Vec<HitboxDataFrame> = Vec::new();
+//     let mut clears: Vec<usize> = Vec::new();
+//     let mut h_end = 0u32;
+//     if let Some(subactions) = fi.action_table[input_move].subactions.as_ref() {
+//         let mut f = 0;
+//         let mut i = 0;
+//         let mut subloop_start = 0usize;
+//         let mut subloop_i = 0usize;
+//         while i < subactions.len() {
+//             let word = subactions[i];
+//             let cmd = dat_tools::dat::subaction_cmd(word);
     
-            use dat_tools::dat::Subaction as S;
-            match dat_tools::dat::parse_next_subaction(&subactions[i..]) {
-                S::EndOfScript => break,
-                S::AsynchronousTimer { frame } => f = frame as usize,
-                S::SynchronousTimer { frame } => f += frame as usize,
+//             use dat_tools::dat::Subaction as S;
+//             match dat_tools::dat::parse_next_subaction(&subactions[i..]) {
+//                 S::EndOfScript => break,
+//                 S::AsynchronousTimer { frame } => f = frame as usize,
+//                 S::SynchronousTimer { frame } => f += frame as usize,
 
-                S::SetLoop { loop_count } => {
-                    subloop_start = i + dat_tools::dat::subaction_size(cmd);
-                    subloop_i = loop_count as usize - 1;
-                }
-                S::ExecuteLoop if subloop_i != 0 => {
-                    subloop_i -= 1;
-                    i = subloop_start;
+//                 S::SetLoop { loop_count } => {
+//                     subloop_start = i + dat_tools::dat::subaction_size(cmd);
+//                     subloop_i = loop_count as usize - 1;
+//                 }
+//                 S::ExecuteLoop if subloop_i != 0 => {
+//                     subloop_i -= 1;
+//                     i = subloop_start;
 
-                    // skip index increment
-                    continue;
-                }
+//                     // skip index increment
+//                     continue;
+//                 }
                 
-                S::CreateHitbox { hitbox_id,
-                    bone_attachment,
-                    damage,
-                    x_offset,
-                    y_offset,
-                    z_offset,
-                    size,
-                    base_knockback,
-                    knockback_growth,
-                    knockback_angle,
-                    weight_dependent_set_knockback,
-                    .. } => {
-                    hitboxes.push(HitboxDataFrame {
-                        frame: f as u32,
-                        hitbox_id,
-                        bone_attachment,
-                        damage,
-                        x_offset,
-                        y_offset,
-                        z_offset,
-                        size,
-                        base_knockback,
-                        knockback_growth,
-                        knockback_angle,
-                        set_knockback: weight_dependent_set_knockback,
-                    });
-                },
-                S::ClearHitboxes => {
-                    h_end = h_end.max(f as u32);
-                    clears.push(f);
-                },
-                _ => (),
-            }
-            i += dat_tools::dat::subaction_size(cmd);
-        }
+//                 S::CreateHitbox { hitbox_id,
+//                     bone_attachment,
+//                     damage,
+//                     x_offset,
+//                     y_offset,
+//                     z_offset,
+//                     size,
+//                     base_knockback,
+//                     knockback_growth,
+//                     knockback_angle,
+//                     weight_dependent_set_knockback,
+//                     .. } => {
+//                     hitboxes.push(HitboxDataFrame {
+//                         frame: f as u32,
+//                         hitbox_id,
+//                         bone_attachment,
+//                         damage,
+//                         x_offset,
+//                         y_offset,
+//                         z_offset,
+//                         size,
+//                         base_knockback,
+//                         knockback_growth,
+//                         knockback_angle,
+//                         set_knockback: weight_dependent_set_knockback,
+//                     });
+//                 },
+//                 S::ClearHitboxes => {
+//                     h_end = h_end.max(f as u32);
+//                     clears.push(f);
+//                 },
+//                 _ => (),
+//             }
+//             i += dat_tools::dat::subaction_size(cmd);
+//         }
 
-        // println!("{:?}", hitboxes);
-        // println!("{:?}", clears);
-    }
+//         // println!("{:?}", hitboxes);
+//         // println!("{:?}", clears);
+//     }
 
-    let mut active_hb_slots: [Option<&HitboxDataFrame>; 16] = [None; 16];
+//     let mut active_hb_slots: [Option<&HitboxDataFrame>; 16] = [None; 16];
 
-    let mut world_transforms =  vec![Mat4::IDENTITY; _bones.len()];
-    for frame_i in 0..(dash_attack.end_frame() as i32) {
-        let _ = writeln!(writer_hurt, "===");
-        let _ = writeln!(writer_hit, "===");
-        anim.apply_animation(&fi.model, &dash_attack, frame_i as f32);
+//     let mut world_transforms =  vec![Mat4::IDENTITY; _bones.len()];
+//     for frame_i in 0..(dash_attack.end_frame() as i32) {
+//         let _ = writeln!(writer_hurt, "===");
+//         let _ = writeln!(writer_hit, "===");
+//         anim.apply_animation(&fi.model, &dash_attack, frame_i as f32);
 
-        // LATER: extracting model vertices -----------------------
-        // fi.model.vertices.iter()
-        //     .for_each(|x| println!("{},{},{}", x.pos().x, x.pos().y, x.pos().z));
+//         // LATER: extracting model vertices -----------------------
+//         // fi.model.vertices.iter()
+//         //     .for_each(|x| println!("{},{},{}", x.pos().x, x.pos().y, x.pos().z));
 
-        // anim.transforms are LOCAL transforms.
-        //   "You can get a global transform by iterating 
-        //   "over the local transforms, and multiplying that local tform with the global 
-        //   "tform of it's parent, creating a new global tform for that idx."
+//         // anim.transforms are LOCAL transforms.
+//         //   "You can get a global transform by iterating 
+//         //   "over the local transforms, and multiplying that local tform with the global 
+//         //   "tform of it's parent, creating a new global tform for that idx."
         
-        for (bone_i, transform) in anim.transforms.iter().enumerate() {
-            world_transforms[bone_i] = match fi.model.bones[bone_i].parent {
-                Some(p_i) => world_transforms[p_i as usize] * *transform,
-                None => *transform
-            };
-        }
+//         for (bone_i, transform) in anim.transforms.iter().enumerate() {
+//             world_transforms[bone_i] = match fi.model.bones[bone_i].parent {
+//                 Some(p_i) => world_transforms[p_i as usize] * *transform,
+//                 None => *transform
+//             };
+//         }
 
-        for i in 0.._hb.len() {
-            let hurtbox = &_hb[i];
-            // let parent_tform = match fi.model.bones[hurtbox.bone as usize].parent {
-            //     Some(p_i) => world_transforms[p_i as usize],
-            //     None => Mat4::IDENTITY
-            // };
-            let parent_tform = Mat4::IDENTITY;
-            let world_tform = world_transforms[hurtbox.bone as usize];
+//         for i in 0.._hb.len() {
+//             let hurtbox = &_hb[i];
+//             // let parent_tform = match fi.model.bones[hurtbox.bone as usize].parent {
+//             //     Some(p_i) => world_transforms[p_i as usize],
+//             //     None => Mat4::IDENTITY
+//             // };
+//             let parent_tform = Mat4::IDENTITY;
+//             let world_tform = world_transforms[hurtbox.bone as usize];
             
-            let pos_a = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_1));
-            let pos_b = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_2));
-            let size = hurtbox.size * CHAR_SCALE_MAP[c.to_u8_internal() as usize];
-            // println!("{},{},{},{},{},{},{}", pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size);
-            let _ = writeln!(
-                writer_hurt,
-                "{},{},{},{},{},{},{}",
-                pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size
-            );
-        }
-        let _ = writer_hurt.flush();
+//             let pos_a = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_1));
+//             let pos_b = parent_tform.transform_point3(world_tform.transform_point3(hurtbox.offset_2));
+//             let size = hurtbox.size * CHAR_SCALE_MAP[c.to_u8_internal() as usize];
+//             // println!("{},{},{},{},{},{},{}", pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size);
+//             let _ = writeln!(
+//                 writer_hurt,
+//                 "{},{},{},{},{},{},{}",
+//                 pos_a.x, pos_a.y, pos_a.z, pos_b.x, pos_b.y, pos_b.z, size
+//             );
+//         }
+//         let _ = writer_hurt.flush();
 
-        // once per frame,
-        // -> look for any `hitboxes` that just started. register em
-        for this_hb in hitboxes.iter() {
-            if this_hb.frame == frame_i as u32 {
-                active_hb_slots[this_hb.hitbox_id as usize] = Some(this_hb);
-            }
-        }
-        // if there is a clear on this frame:
-        if clears.contains(&(frame_i as usize)) {
-            active_hb_slots.fill(Option::None);
-        }
+//         // once per frame,
+//         // -> look for any `hitboxes` that just started. register em
+//         for this_hb in hitboxes.iter() {
+//             if this_hb.frame == frame_i as u32 {
+//                 active_hb_slots[this_hb.hitbox_id as usize] = Some(this_hb);
+//             }
+//         }
+//         // if there is a clear on this frame:
+//         if clears.contains(&(frame_i as usize)) {
+//             active_hb_slots.fill(Option::None);
+//         }
 
-        for active_hitbox_maybe in active_hb_slots {
-            if active_hitbox_maybe.is_none() { continue; }
-            let this_hb = active_hitbox_maybe.unwrap();
-            const SCALE: f32 = 0.003906;  // conversion to world units... lol
-            let pt = Vec3::from([
-                this_hb.z_offset as f32,
-                this_hb.y_offset as f32,
-                this_hb.x_offset as f32,
-            ])
-            * SCALE
-            * CHAR_SCALE_MAP[c.to_u8_internal() as usize];
-            let connected_bone = this_hb.bone_attachment;
-            let assoc_transform = world_transforms[connected_bone as usize];
-            let resultant_pt: Vec3 = assoc_transform.transform_point3(pt);
+//         for active_hitbox_maybe in active_hb_slots {
+//             if active_hitbox_maybe.is_none() { continue; }
+//             let this_hb = active_hitbox_maybe.unwrap();
+//             const SCALE: f32 = 0.003906;  // conversion to world units... lol
+//             let pt = Vec3::from([
+//                 this_hb.z_offset as f32,
+//                 this_hb.y_offset as f32,
+//                 this_hb.x_offset as f32,
+//             ])
+//             * SCALE
+//             * CHAR_SCALE_MAP[c.to_u8_internal() as usize];
+//             let connected_bone = this_hb.bone_attachment;
+//             let assoc_transform = world_transforms[connected_bone as usize];
+//             let resultant_pt: Vec3 = assoc_transform.transform_point3(pt);
 
-            let _ = writeln!(
-                writer_hit,
-                "{},{},{},{},{},{},{},{},{},{},{}",
-                frame_i,
-                this_hb.hitbox_id,
-                this_hb.damage,
-                this_hb.knockback_angle,
-                this_hb.base_knockback,
-                this_hb.knockback_growth,
-                this_hb.set_knockback,
-                resultant_pt.x,
-                resultant_pt.y,
-                resultant_pt.z,
-                (this_hb.size as f32) * SCALE,
-            );
-        }
-    }
+//             let _ = writeln!(
+//                 writer_hit,
+//                 "{},{},{},{},{},{},{},{},{},{},{}",
+//                 frame_i,
+//                 this_hb.hitbox_id,
+//                 this_hb.damage,
+//                 this_hb.knockback_angle,
+//                 this_hb.base_knockback,
+//                 this_hb.knockback_growth,
+//                 this_hb.set_knockback,
+//                 resultant_pt.x,
+//                 resultant_pt.y,
+//                 resultant_pt.z,
+//                 (this_hb.size as f32) * SCALE,
+//             );
+//         }
+//     }
 
-    // println!("{} hurtboxes: {:?}", fi.hurtboxes.len(), fi.hurtboxes);  // 13, ASSOCIATED to bones.
-    // println!("{} bones: {:?}", bones.len(), bones);  // 73. Have "parents" and pgroup_start, pgroup_len
-}
+//     // println!("{} hurtboxes: {:?}", fi.hurtboxes.len(), fi.hurtboxes);  // 13, ASSOCIATED to bones.
+//     // println!("{} bones: {:?}", bones.len(), bones);  // 73. Have "parents" and pgroup_start, pgroup_len
+// }
 
 #[pymodule]
-fn animations(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(data_dump, m)?)?;
-    m.add_function(wrap_pyfunction!(main, m)?)?;
-    Ok(())
+mod animations {
+    #[pymodule_export]
+    use super::data_dump;
+    #[pymodule_export]
+    use super::HitBoxProcessed;
+    #[pymodule_export]
+    use super::HurtBoxProcessed;
 }
