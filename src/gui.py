@@ -9,8 +9,6 @@ PLAYING = False
 def vis_window_setup(chars, anims, bighurt, bighit):  # debug signature
     dpg.create_context()
 
-    hurt = [[]]*5
-
     def left_panel():
         dpg.add_spacer(tag="data_dummy", user_data=(bighurt, bighit))
         dpg.add_file_dialog(
@@ -30,7 +28,7 @@ def vis_window_setup(chars, anims, bighurt, bighit):  # debug signature
     def right_panel():
         with dpg.drawlist(250, 250, tag="dlist", user_data=()):
             dpg.draw_rectangle(pmin=[25, 25], pmax=[225, 225])
-        dpg.add_slider_int(min_value=0, max_value=len(hurt)-1, width=200, tag="slider",
+        dpg.add_slider_int(min_value=0, max_value=1, width=200, tag="slider",
                            callback=on_slider_change)
         dpg.add_button(
             label="Play animation",
@@ -52,7 +50,11 @@ def vis_window_setup(chars, anims, bighurt, bighit):  # debug signature
 
     while dpg.is_dearpygui_running():
         if PLAYING:
-            dpg.set_value("slider", (dpg.get_value("slider")+1) % (len(hurt)-1))
+            dpg.set_value(
+                "slider",
+                (dpg.get_value("slider")+1)
+                % (dpg.get_item_configuration("slider")["max_value"])
+            )
             on_slider_change()
         dpg.render_dearpygui_frame()
     dpg.destroy_context()
@@ -84,8 +86,9 @@ def on_animation_choice():
     (bighurt, bighit) = dpg.get_item_user_data("data_dummy")
     hurt_list = bighurt[char_index][anim_index]
     hit_list = bighit[char_index][anim_index]
-    breakpoint()
     dpg.set_item_user_data("dlist", (hurt_list, hit_list))
+    dpg.configure_item("slider", max_value=len(hurt_list)-1)
+    on_slider_change()
 
 
 def on_slider_change():
@@ -95,24 +98,26 @@ def on_slider_change():
     # Draw the frameee
     frame_n = dpg.get_value("slider")
 
-    (bones, hitboxes) = dpg.get_item_user_data("dlist")
-    
-
-    for bone_str in bones:
-        bones_floats = [float(b) for b in bone_str.split(",")]
-        (x1, y1, z1, x2, y2, z2, scale) = bones_floats
+    hurt_list, hit_list = dpg.get_item_user_data("dlist")
+    for bone_struct in hurt_list[frame_n]:
+        x1, y1, z1 = bone_struct.pos_a
+        x2, y2, z2 = bone_struct.pos_b
+        scale = bone_struct.size
+        # bones_floats = [float(b) for b in bone_str.split(",")]
+        # (x1, y1, z1, x2, y2, z2, scale) = bones_floats
         dpg_draw_capsule(90+z1 * DRAW_SCALE,
                          135-y1 * DRAW_SCALE,
                          90+z2 * DRAW_SCALE,
                          135-y2 * DRAW_SCALE,
                          scale * DRAW_SCALE
                          )
-    for hitbox_str in hitboxes:
-        hit_floats = [float(h) for h in hitbox_str.split(",")]
-        x1 = hit_floats[7] * DRAW_SCALE
-        y1 = hit_floats[8] * DRAW_SCALE
-        z1 = hit_floats[9] * DRAW_SCALE
-        r1 = hit_floats[10] * DRAW_SCALE
+
+    for hitbox_struct in hit_list:
+        # hit_floats = [float(h) for h in hitbox_str.split(",")]
+        if hitbox_struct.frame_i != frame_n:
+            continue
+        x1, y1, z1 = [a * DRAW_SCALE for a in hitbox_struct.pos]
+        r1 = hitbox_struct.size * DRAW_SCALE
         dpg.draw_circle([90+z1, 135-y1], r1, color=[255, 0, 0], parent="dlist")
 
 
