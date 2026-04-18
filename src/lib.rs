@@ -4,10 +4,10 @@ use dat_tools::dat::{AnimationFrame, FighterData};
 use glam::f32::{Mat4, Vec3};
 use slp_parser::Character;
 
-use core::panic;
-use std::env;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+// use core::panic;
+// use std::env;
+// use std::fs::File;
+// use std::io::{BufWriter, Write};
 
 use pyo3::prelude::*;
 
@@ -69,14 +69,14 @@ struct HitboxDataFrame {
     set_knockback: u16,
 }
 
-#[pyclass]
+#[pyclass(get_all)]
 struct HurtBoxProcessed {
-    pos_a: Vec3,
-    pos_b: Vec3,
+    pos_a: [f32; 3],
+    pos_b: [f32; 3],
     size: f32
 }
 
-#[pyclass]
+#[pyclass(get_all)]
 struct HitBoxProcessed {
     frame_i: usize,
     hitbox_id: u8,
@@ -85,7 +85,7 @@ struct HitBoxProcessed {
     base_knockback: u16,
     knockback_growth: u16,
     set_knockback: u16,
-    pos: Vec3,
+    pos: [f32; 3],
     size: f32,
 }
 
@@ -158,7 +158,11 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                 let pos_b = world_tform.transform_point3(hurtbox.offset_2);
                 let size = hurtbox.size * CHAR_SCALE_MAP[fighter_internal_id];
 
-                action_hurt_list.push(HurtBoxProcessed { pos_a, pos_b, size })
+                action_hurt_list.push(HurtBoxProcessed {
+                    pos_a: pos_a.into(),
+                    pos_b: pos_b.into(),
+                    size: size
+                })
             }
             // HITbox math
             // -> look for any `hitboxes` that just started; register em
@@ -200,7 +204,7 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                     base_knockback: this_hb.base_knockback,
                     knockback_growth: this_hb.knockback_growth,
                     set_knockback: this_hb.set_knockback,
-                    pos: resultant_pt,
+                    pos: resultant_pt.into(),
                     size: size
                 });
             }
