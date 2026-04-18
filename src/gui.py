@@ -1,14 +1,18 @@
 import dearpygui.dearpygui as dpg
 
+from animations import data_dump, HitBoxProcessed, HurtBoxProcessed
 from vis import hitboxes_from_file, hurtboxes_from_file, lerp_2d
 
 PLAYING = False
 
 
-def vis_window_setup(hit, hurt):  # debug signature
+def vis_window_setup(chars, anims, bighurt, bighit):  # debug signature
     dpg.create_context()
 
+    hurt = [[]]*5
+
     def left_panel():
+        dpg.add_spacer(tag="data_dummy", user_data=(bighurt, bighit))
         dpg.add_file_dialog(
             directory_selector=True, show=False, callback=lambda x: _,
             tag="file_dialog_id", cancel_callback=lambda x: _, width=700,
@@ -19,13 +23,13 @@ def vis_window_setup(hit, hurt):  # debug signature
             callback=lambda: dpg.show_item("file_dialog_id")
         )
         dpg.add_text("Backup location: (None chosen)")
-        dpg.add_combo(["fox", "marth", "falco"])
-        dpg.add_combo(["56", "27"])
-        dpg.add_button(label="Retrieve", callback=process_data)
+        dpg.add_combo(chars, tag="char_combo", callback=on_character_choice, user_data=chars)
+        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, user_data=anims)
+        dpg.add_button(label="Retrieve", callback=None)
 
     def right_panel():
-        with dpg.drawlist(200, 200, tag="dlist", user_data=(hit, hurt)):
-            dpg.draw_rectangle(pmin=[15, 15], pmax=[185, 185])
+        with dpg.drawlist(250, 250, tag="dlist", user_data=()):
+            dpg.draw_rectangle(pmin=[25, 25], pmax=[225, 225])
         dpg.add_slider_int(min_value=0, max_value=len(hurt)-1, width=200, tag="slider",
                            callback=on_slider_change)
         dpg.add_button(
@@ -54,10 +58,6 @@ def vis_window_setup(hit, hurt):  # debug signature
     dpg.destroy_context()
 
 
-def process_data():
-    ...
-
-
 def toggle_play():
     global PLAYING
     PLAYING = not PLAYING
@@ -69,15 +69,34 @@ def dpg_draw_capsule(y1, z1, y2, z2, size):
         dpg.draw_circle([x, y], size, parent="dlist")
 
 
+def on_character_choice():
+    anims = dpg.get_item_user_data("anim_combo")
+    chars = dpg.get_item_user_data("char_combo")
+    selection = dpg.get_value("char_combo")
+    dpg.configure_item("anim_combo", items=anims[chars.index(selection)])
+
+
+def on_animation_choice():
+    char_selection = dpg.get_value("char_combo")
+    char_index = dpg.get_item_user_data("char_combo").index(char_selection)
+    anim_selection = dpg.get_value("anim_combo")
+    anim_index = dpg.get_item_user_data("anim_combo")[char_index].index(anim_selection)
+    (bighurt, bighit) = dpg.get_item_user_data("data_dummy")
+    hurt_list = bighurt[char_index][anim_index]
+    hit_list = bighit[char_index][anim_index]
+    breakpoint()
+    dpg.set_item_user_data("dlist", (hurt_list, hit_list))
+
+
 def on_slider_change():
     DRAW_SCALE = 4.5
     # Clear canvas
     dpg.delete_item("dlist", children_only=True)
     # Draw the frameee
     frame_n = dpg.get_value("slider")
-    (hit, hurt) = dpg.get_item_user_data("dlist")
-    bones = hurt[frame_n]
-    hitboxes = hit[frame_n]
+
+    (bones, hitboxes) = dpg.get_item_user_data("dlist")
+    
 
     for bone_str in bones:
         bones_floats = [float(b) for b in bone_str.split(",")]
@@ -98,6 +117,10 @@ def on_slider_change():
 
 
 if __name__ == "__main__":
-    hit = hitboxes_from_file("output_hitboxes.crd")
-    hurt = hurtboxes_from_file("output_hurtboxes.crd")
-    vis_window_setup(hit, hurt)
+
+    # Later, this will be a retrieve-from-db!
+    (chars, anims, bighurt, bighit) = data_dump(
+        "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
+    )
+
+    vis_window_setup(chars, anims, bighurt, bighit)
