@@ -188,9 +188,10 @@ fn compute_frame_lists(fighter_data: &FighterData, fighter_internal_id: usize) -
                     this_hb.y_offset as f32,
                     this_hb.x_offset as f32,
                 ])
-                * SCALE
-                * CHAR_SCALE_MAP[fighter_internal_id];
-                let size = (this_hb.size as f32 * SCALE) * CHAR_SCALE_MAP[fighter_internal_id];
+                * SCALE;
+                // * CHAR_SCALE_MAP[fighter_internal_id];
+                let size = (this_hb.size as f32 * SCALE);
+                    // * CHAR_SCALE_MAP[fighter_internal_id];
 
                 if this_hb.bone_attachment >= world_transforms.len() as u8 {
                     // Kirby bullshit
