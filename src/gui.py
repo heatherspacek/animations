@@ -75,7 +75,15 @@ def on_character_choice():
     anims = dpg.get_item_user_data("anim_combo")
     chars = dpg.get_item_user_data("char_combo")
     selection = dpg.get_value("char_combo")
-    dpg.configure_item("anim_combo", items=anims[chars.index(selection)])
+    char_index = chars.index(selection)
+    (bighurt, _) = dpg.get_item_user_data("data_dummy")
+    filtered_anim_list = [
+        a
+        for a, lst in zip(anims[char_index], bighurt[char_index])
+        if lst  # non-empty
+    ]
+    breakpoint()
+    dpg.configure_item("anim_combo", items=filtered_anim_list)
 
 
 def on_animation_choice():
