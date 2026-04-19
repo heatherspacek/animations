@@ -11,6 +11,38 @@ use slp_parser::Character;
 
 use pyo3::prelude::*;
 
+// #[pyfunction]
+// fn get_one_move(character_id: usize, action_id: usize) -> PyResult<Vec<HurtBoxProcessed>> {
+
+//     Ok(())
+// }
+
+#[pyfunction]
+fn dump_one_character(iso_path: &str, character_id: u8) -> PyResult<(
+    Vec<String>,  // Animations maps
+    Vec<Vec<Vec<HurtBoxProcessed>>>, // Hurtbox lists
+    Vec<Vec<HitBoxProcessed>>, // Hitbox lists
+)> {
+    // let mut animations_map: Vec<String> = Vec::new();
+    // let mut hitbox_lists: Vec<Vec<HitBoxProcessed>> = Vec::new();
+    // let mut hurtbox_lists: Vec<Vec<Vec<HurtBoxProcessed>>> = Vec::new();
+    let file = std::fs::File::open(
+        iso_path
+    )?;
+    let mut files = dat_tools::isoparser::ISODatFiles::new(file).unwrap();
+
+    let character = Character::from_u8_internal(character_id).unwrap().neutral();
+    let data = dat_tools::get_fighter_data(&mut files, character).unwrap();
+
+    let animations_map = get_anim_map(&data);
+    let (hurtbox_lists, hitbox_lists) = compute_frame_lists(
+            &data, character_id as usize
+        );
+
+    Ok((animations_map, hurtbox_lists, hitbox_lists))
+}
+
+
 #[pyfunction]
 fn data_dump(iso_path: &str) -> PyResult<(
     Vec<String>,  // Character names
@@ -495,6 +527,8 @@ fn hits_and_clears(subactions_list: Option<&Box<[u32]>>) ->
 mod animations {
     #[pymodule_export]
     use super::data_dump;
+    #[pymodule_export]
+    use super::dump_one_character;
     #[pymodule_export]
     use super::HitBoxProcessed;
     #[pymodule_export]
