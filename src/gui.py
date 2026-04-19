@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
 
 from animations import data_dump, HitBoxProcessed, HurtBoxProcessed
-from vis import hitboxes_from_file, hurtboxes_from_file, lerp_2d
+from vis import lerp_2d
 
 PLAYING = False
 
@@ -82,7 +82,6 @@ def on_character_choice():
         for a, lst in zip(anims[char_index], bighurt[char_index])
         if lst  # non-empty
     ]
-    breakpoint()
     dpg.configure_item("anim_combo", items=filtered_anim_list)
 
 
