@@ -14,7 +14,11 @@ dependencies = [
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
+[tool.maturin]
+python-source = "mess"
+
 [tool.uv]
 cache-keys = [{file = "pyproject.toml"}, {file = "rust/Cargo.toml"}, {file = "**/*.rs"}]
 reinstall-package = ["animations"]
 no-build-isolation-package = ["animations"]
+

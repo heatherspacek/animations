@@ -1,8 +1,8 @@
 import dearpygui.dearpygui as dpg
 
 # from animations import HitBoxProcessed, HurtBoxProcessed
-from vis import lerp_2d
-from data import retrieve_character_data, retrieve_move_data, name_to_internal_id
+from .vis import lerp_2d
+from .data import retrieve_character_data, retrieve_move_data, name_to_internal_id
 
 PLAYING = False
 
