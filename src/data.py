@@ -39,23 +39,29 @@ def name_to_internal_id(name_in):
     except ValueError:
         return INTERNAL_NAMES.index(ALIAS_MAP[name_in])
 
-data_cache = {}
+
+_data_cache = {}
 
 
-def retrieve_move(character_id, move_id):
-    if character_id in data_cache:
-        # Cache hit
-        print("cache hit, remainder tbd")
-        return
-    data_cache[character_id] = dump_one_character(
+def retrieve_move_data(character_id: int, move_id: int) -> tuple[list, list]:
+    ...
+    _, hurts, hits = retrieve_character_data(character_id)
+    return hurts[move_id], hits[move_id]
+
+
+def retrieve_character_data(character_id) -> tuple[list, list, list]:
+    if character_id in _data_cache:
+        return _data_cache[character_id]
+
+    _data_cache[character_id] = dump_one_character(
         "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso",
         character_id
     )
-    retrieve_move(character_id, move_id)
+    return retrieve_character_data(character_id)
 
 
 if __name__ == "__main__":
-    breakpoint()
-    retrieve_move(2, 55)
+    # breakpoint()
+    (hu, hi) = retrieve_move_data(2, 55)
 
     breakpoint()

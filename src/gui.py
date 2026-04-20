@@ -1,16 +1,17 @@
 import dearpygui.dearpygui as dpg
 
-from animations import data_dump, HitBoxProcessed, HurtBoxProcessed
+# from animations import HitBoxProcessed, HurtBoxProcessed
 from vis import lerp_2d
+from data import retrieve_character_data, retrieve_move_data, name_to_internal_id
 
 PLAYING = False
 
 
-def vis_window_setup(chars, anims, bighurt, bighit):  # debug signature
+def vis_window_setup(chars):
     dpg.create_context()
 
     def left_panel():
-        dpg.add_spacer(tag="data_dummy", user_data=(bighurt, bighit))
+        # dpg.add_spacer(tag="data_dummy)
         dpg.add_file_dialog(
             directory_selector=True, show=False, callback=lambda x: _,
             tag="file_dialog_id", cancel_callback=lambda x: _, width=700,
@@ -21,8 +22,8 @@ def vis_window_setup(chars, anims, bighurt, bighit):  # debug signature
             callback=lambda: dpg.show_item("file_dialog_id")
         )
         dpg.add_text("Backup location: (None chosen)")
-        dpg.add_combo(chars, tag="char_combo", callback=on_character_choice, user_data=chars)
-        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, user_data=anims)
+        dpg.add_combo(chars, tag="char_combo", callback=on_character_choice, user_data=...)
+        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, user_data=...)
         dpg.add_button(label="Retrieve", callback=None)
 
     def right_panel():
@@ -72,29 +73,28 @@ def dpg_draw_capsule(y1, z1, y2, z2, size):
 
 
 def on_character_choice():
-    anims = dpg.get_item_user_data("anim_combo")
-    chars = dpg.get_item_user_data("char_combo")
     selection = dpg.get_value("char_combo")
-    char_index = chars.index(selection)
-    (bighurt, _) = dpg.get_item_user_data("data_dummy")
-    filtered_anim_list = [
+    anims_list, hurts_list, _ = retrieve_character_data(name_to_internal_id(selection))
+    filtered_anim_list = list(set([
         a
-        for a, lst in zip(anims[char_index], bighurt[char_index])
+        for a, lst in zip(anims_list, hurts_list)
         if lst  # non-empty
-    ]
+    ]))
+    # filtered_anim_list = anims_list
     dpg.configure_item("anim_combo", items=filtered_anim_list)
 
 
 def on_animation_choice():
     char_selection = dpg.get_value("char_combo")
-    char_index = dpg.get_item_user_data("char_combo").index(char_selection)
     anim_selection = dpg.get_value("anim_combo")
-    anim_index = dpg.get_item_user_data("anim_combo")[char_index].index(anim_selection)
-    (bighurt, bighit) = dpg.get_item_user_data("data_dummy")
-    hurt_list = bighurt[char_index][anim_index]
-    hit_list = bighit[char_index][anim_index]
-    dpg.set_item_user_data("dlist", (hurt_list, hit_list))
-    dpg.configure_item("slider", max_value=len(hurt_list)-1)
+    anims_list, _, _ = retrieve_character_data(name_to_internal_id(char_selection))
+    hurts, hits = retrieve_move_data(
+        name_to_internal_id(char_selection),
+        anims_list.index(anim_selection)
+    )
+
+    dpg.set_item_user_data("dlist", (hurts, hits))
+    dpg.configure_item("slider", max_value=len(hurts)-1)
     on_slider_change()
 
 
@@ -131,8 +131,14 @@ def on_slider_change():
 if __name__ == "__main__":
 
     # Later, this will be a retrieve-from-db!
-    (chars, anims, bighurt, bighit) = data_dump(
-        "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
-    )
+    # (chars, anims, bighurt, bighit) = data_dump(
+    #     "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
+    # )
+    chars = [
+        "Fox",
+        "Falco",
+        "Captain Falcon",
+        "Marth",
+    ]
 
-    vis_window_setup(chars, anims, bighurt, bighit)
+    vis_window_setup(chars)
