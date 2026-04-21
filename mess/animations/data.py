@@ -43,25 +43,22 @@ def name_to_internal_id(name_in):
 _data_cache = {}
 
 
-def retrieve_move_data(character_id: int, move_id: int) -> tuple[list, list]:
+def retrieve_move_data(iso_path: str, character_id: int, move_id: int) -> tuple[list, list]:
     ...
-    _, hurts, hits = retrieve_character_data(character_id)
+    _, hurts, hits = retrieve_character_data(iso_path, character_id)
     return hurts[move_id], hits[move_id]
 
 
-def retrieve_character_data(character_id) -> tuple[list, list, list]:
+def retrieve_character_data(iso_path, character_id) -> tuple[list, list, list]:
     if character_id in _data_cache:
         return _data_cache[character_id]
 
     _data_cache[character_id] = dump_one_character(
-        "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso",
+        iso_path,
         character_id
     )
-    return retrieve_character_data(character_id)
+    return retrieve_character_data(iso_path, character_id)
 
 
 if __name__ == "__main__":
-    # breakpoint()
-    (hu, hi) = retrieve_move_data(2, 55)
-
-    breakpoint()
+    ...

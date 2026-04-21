@@ -1,53 +1,73 @@
-import dearpygui.dearpygui as dpg
+import tkinter as tk
+from tkinter import filedialog
 
-# from animations import HitBoxProcessed, HurtBoxProcessed
-from .vis import lerp_2d
-from .data import retrieve_character_data, retrieve_move_data, name_to_internal_id
+import dearpygui.dearpygui as dpg
+from platformdirs import user_cache_path
+
+from mess.animations.vis import lerp_2d
+from mess.animations.data import retrieve_character_data, retrieve_move_data, name_to_internal_id
 
 PLAYING = False
+CACHE_PATH = user_cache_path(
+    "mess.animations",
+    "Heather Spacek",
+    ensure_exists=True
+)
 
 
 def vis_window_setup(chars):
     dpg.create_context()
 
-    def left_panel():
-        # dpg.add_spacer(tag="data_dummy)
+    with dpg.window(tag="win", width=500, height=700):
         dpg.add_file_dialog(
             directory_selector=True, show=False, callback=lambda x: _,
             tag="file_dialog_id", cancel_callback=lambda x: _, width=700,
             height=400
         )
         dpg.add_button(
-            label="Location of SSBM disc backup...",
-            callback=lambda: dpg.show_item("file_dialog_id")
+            label="Choose location of SSBM disk backup...",
+            callback=select_iso
         )
-        dpg.add_text("Backup location: (None chosen)")
-        dpg.add_combo(chars, tag="char_combo", callback=on_character_choice, user_data=...)
-        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, user_data=...)
-        dpg.add_button(label="Retrieve", callback=None)
+        with dpg.group(horizontal=True):
+            dpg.add_text("Backup file path: ")
+            dpg.add_text("(None chosen)", tag="loaded_iso_path")
+        dpg.add_combo(chars, tag="char_combo", callback=on_character_choice, width=-1)
+        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, width=-1)
+        with dpg.group(horizontal=True):
+            dpg.add_button(
+                label="Play/Pause",
+                callback=toggle_play,
+                width=100
+            )
+            dpg.add_spacer(width=50)
+            dpg.add_button(label=" - ", callback=frame_minus_button)
+            dpg.add_slider_int(
+                min_value=0,
+                max_value=1,
+                width=150,
+                tag="slider",
+                callback=on_slider_change
+            )
+            dpg.add_button(label=" + ", callback=frame_plus_button)
 
-    def right_panel():
-        with dpg.drawlist(250, 250, tag="dlist", user_data=()):
-            dpg.draw_rectangle(pmin=[25, 25], pmax=[225, 225])
-        dpg.add_slider_int(min_value=0, max_value=1, width=200, tag="slider",
-                           callback=on_slider_change)
-        dpg.add_button(
-            label="Play animation",
-            callback=toggle_play
-        )
-
-    with dpg.window(tag="win", width=700, height=700):
-        with dpg.group(horizontal=True) as _:
-            with dpg.group():
-                left_panel()
-            with dpg.group():
-                right_panel()
+        with dpg.drawlist(500, 500, tag="dlist", user_data=()):
+            dpg.draw_rectangle(pmin=[25, 25], pmax=[475, 475])
 
     # #######################################################
-    dpg.create_viewport(title="Tool1", width=700, height=700)
+    dpg.create_viewport(title="mess.animations.gui", width=700, height=700)
     dpg.setup_dearpygui()
     dpg.show_viewport()
     dpg.set_primary_window("win", True)
+
+    # Startup state-check.
+    try:
+        with open(CACHE_PATH / "last_seen_iso_path", 'r') as f:
+            last_seen_iso_path = f.read()
+    except FileNotFoundError:
+        # no last-seen
+        disable_all()
+    else:
+        dpg.set_value("loaded_iso_path", last_seen_iso_path)
 
     while dpg.is_dearpygui_running():
         if PLAYING:
@@ -74,7 +94,11 @@ def dpg_draw_capsule(y1, z1, y2, z2, size):
 
 def on_character_choice():
     selection = dpg.get_value("char_combo")
-    anims_list, hurts_list, _ = retrieve_character_data(name_to_internal_id(selection))
+    iso_path = dpg.get_value("loaded_iso_path")
+    anims_list, hurts_list, _ = retrieve_character_data(
+        iso_path,
+        name_to_internal_id(selection)
+    )
     filtered_anim_list = list(set([
         a
         for a, lst in zip(anims_list, hurts_list)
@@ -87,8 +111,13 @@ def on_character_choice():
 def on_animation_choice():
     char_selection = dpg.get_value("char_combo")
     anim_selection = dpg.get_value("anim_combo")
-    anims_list, _, _ = retrieve_character_data(name_to_internal_id(char_selection))
+    iso_path = dpg.get_value("loaded_iso_path")
+    anims_list, _, _ = retrieve_character_data(
+        iso_path,
+        name_to_internal_id(char_selection)
+    )
     hurts, hits = retrieve_move_data(
+        iso_path,
         name_to_internal_id(char_selection),
         anims_list.index(anim_selection)
     )
@@ -99,9 +128,10 @@ def on_animation_choice():
 
 
 def on_slider_change():
-    DRAW_SCALE = 4.5
+    DRAW_SCALE = 15
     # Clear canvas
     dpg.delete_item("dlist", children_only=True)
+    dpg.draw_rectangle(pmin=[25, 25], pmax=[475, 475], parent="dlist")
     # Draw the frameee
     frame_n = dpg.get_value("slider")
 
@@ -112,10 +142,10 @@ def on_slider_change():
         scale = bone_struct.size
         # bones_floats = [float(b) for b in bone_str.split(",")]
         # (x1, y1, z1, x2, y2, z2, scale) = bones_floats
-        dpg_draw_capsule(90+z1 * DRAW_SCALE,
-                         135-y1 * DRAW_SCALE,
-                         90+z2 * DRAW_SCALE,
-                         135-y2 * DRAW_SCALE,
+        dpg_draw_capsule(190+z1 * DRAW_SCALE,
+                         335-y1 * DRAW_SCALE,
+                         190+z2 * DRAW_SCALE,
+                         335-y2 * DRAW_SCALE,
                          scale * DRAW_SCALE
                          )
 
@@ -125,20 +155,72 @@ def on_slider_change():
             continue
         x1, y1, z1 = [a * DRAW_SCALE for a in hitbox_struct.pos]
         r1 = hitbox_struct.size * DRAW_SCALE
-        dpg.draw_circle([90+z1, 135-y1], r1, color=[255, 0, 0], parent="dlist")
+        dpg.draw_circle([190+z1, 335-y1], r1, color=[255, 0, 0], parent="dlist")
+
+
+def frame_minus_button():
+    wraparound = dpg.get_value("slider") - 1
+    if wraparound < 0:
+        wraparound = dpg.get_item_configuration("slider")["max_value"]
+    dpg.set_value("slider", wraparound)
+    on_slider_change()
+
+
+def frame_plus_button():
+    wraparound = dpg.get_value("slider") + 1
+    _max = dpg.get_item_configuration("slider")["max_value"]
+    if wraparound > _max:
+        wraparound = 0
+    dpg.set_value("slider", wraparound)
+    on_slider_change()
+
+
+def select_iso():
+    # Hide a tkinter root window.
+    # This lets us use an OS-native (-ish) folder selection dialog.
+    # (On Windows this should look full native. There's a nice fallback
+    # on non-Windows that's superior to the DPG one.)
+    root = tk.Tk()
+    root.withdraw()
+    folder_selected = filedialog.askopenfilename(
+        title="Choose location of SSBM backup image",
+        initialdir=".",
+        filetypes=[("GameCube Disk Image Backup", "*.iso")]
+    )
+    if folder_selected is not None:
+        try:
+            _ = retrieve_character_data(folder_selected, 1)
+        except Exception:
+            dpg.set_value("loaded_iso_path", "** Issue reading the chosen file.")
+            disable_all()
+        else:
+            with open(CACHE_PATH / "last_seen_iso_path", 'w') as f:
+                f.write(folder_selected)
+            dpg.set_value("loaded_iso_path", folder_selected)
+            enable_all()
+
+
+def enable_all():
+    dpg.enable_item("slider")
+    dpg.enable_item("char_combo")
+    dpg.enable_item("anim_combo")
+
+
+def disable_all():
+    dpg.disable_item("slider")
+    dpg.disable_item("char_combo")
+    dpg.disable_item("anim_combo")
 
 
 if __name__ == "__main__":
 
-    # Later, this will be a retrieve-from-db!
-    # (chars, anims, bighurt, bighit) = data_dump(
-    #     "/home/heather/Documents/Disk Images/Super Smash Bros. Melee (v1.02).iso"
-    # )
+    # fmt: off
     chars = [
-        "Fox",
-        "Falco",
-        "Captain Falcon",
-        "Marth",
+        "Fox", "Falco", "Marth", "Captain Falcon", "Sheik", "Peach",
+        "Jigglypuff", "Popo", "Yoshi", "Pikachu", "Luigi", "Samus",
+        "Donkey Kong", "Ganondorf", "Dr. Mario", "Link", "Mario",
+        "Mr. Game and Watch", "Young Link", "Pichu", "Roy", "Mewtwo",
+        "Zelda", "Ness", "Bowser", "Kirby",
     ]
-
+    # fmt: on
     vis_window_setup(chars)
