@@ -137,7 +137,7 @@ def decorate_action_names(names_list, hurts_lists):
 
 
 def resolve_original_name(name_in):
-    ...
+    return next(k for k, v in MOVE_ALIAS_MAP.items() if v == name_in)
 
 
 def name_to_internal_id(name_in):

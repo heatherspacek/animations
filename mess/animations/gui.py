@@ -10,6 +10,7 @@ from mess.animations.data import (
     retrieve_move_data,
     name_to_internal_id,
     decorate_action_names,
+    resolve_original_name,
 )
 
 PLAYING = False
@@ -125,7 +126,7 @@ def on_animation_choice():
     hurts, hits = retrieve_move_data(
         iso_path,
         name_to_internal_id(char_selection),
-        anims_list.index(anim_selection)
+        anims_list.index(resolve_original_name(anim_selection))
     )
 
     dpg.set_item_user_data("dlist", (hurts, hits))
