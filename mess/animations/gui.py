@@ -5,7 +5,12 @@ import dearpygui.dearpygui as dpg
 from platformdirs import user_cache_path
 
 from mess.animations.vis import lerp_2d
-from mess.animations.data import retrieve_character_data, retrieve_move_data, name_to_internal_id
+from mess.animations.data import (
+    retrieve_character_data,
+    retrieve_move_data,
+    name_to_internal_id,
+    decorate_action_names,
+)
 
 PLAYING = False
 CACHE_PATH = user_cache_path(
@@ -17,6 +22,11 @@ CACHE_PATH = user_cache_path(
 
 def vis_window_setup(chars):
     dpg.create_context()
+
+    with dpg.font_registry():
+        dpg.add_font("res/NotoSans-Regular.ttf", size=16*2, tag="default_font")
+    dpg.bind_font("default_font")
+    dpg.set_global_font_scale(0.5)
 
     with dpg.window(tag="win", width=500, height=700):
         dpg.add_file_dialog(
@@ -32,7 +42,7 @@ def vis_window_setup(chars):
             dpg.add_text("Backup file path: ")
             dpg.add_text("(None chosen)", tag="loaded_iso_path")
         dpg.add_combo(chars, tag="char_combo", callback=on_character_choice, width=-1)
-        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, width=-1)
+        dpg.add_combo([], tag="anim_combo", callback=on_animation_choice, width=-1, height_mode=dpg.mvComboHeight_Large)
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label="Play/Pause",
@@ -99,12 +109,8 @@ def on_character_choice():
         iso_path,
         name_to_internal_id(selection)
     )
-    filtered_anim_list = list(set([
-        a
-        for a, lst in zip(anims_list, hurts_list)
-        if lst  # non-empty
-    ]))
-    # filtered_anim_list = anims_list
+    filtered_anim_list = decorate_action_names(anims_list, hurts_list)
+
     dpg.configure_item("anim_combo", items=filtered_anim_list)
 
 
