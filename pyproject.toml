@@ -18,7 +18,7 @@ build-backend = "maturin"
 
 [tool.maturin]
 python-source = "mess"
-module-name = "mess.animations"
+module-name = "animations._rs"
 
 [tool.uv]
 cache-keys = [{file = "pyproject.toml"}, {file = "rust/Cargo.toml"}, {file = "**/*.rs"}]

@@ -524,7 +524,7 @@ fn hits_and_clears(subactions_list: Option<&Box<[u32]>>) ->
 // }
 
 #[pymodule]
-mod animations {
+mod _rs {
     #[pymodule_export]
     use super::data_dump;
     #[pymodule_export]
